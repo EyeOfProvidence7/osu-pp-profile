@@ -7,7 +7,7 @@ from Models import Score
 from osrparse import parse_replay_file
 from osrparse.enums import Mod, GameMode
 
-dir_path = 'E:/Games/osu!/Replays/*'
+dir_path = 'D:/osu!/Replays/*'
 replay_wait_period = 100
 replay_wait_timeout = 5000
 get_replay_lock = False
@@ -43,7 +43,8 @@ def get_late_replay(latest_file_time):
         replay_wait_time += replay_wait_period
         list_of_files = glob.glob(dir_path)
         latest_file = max(list_of_files, key=os.path.getmtime)
-        if os.path.getmtime(latest_file) != latest_file_time:
+        new_latest_file_time = int(round(os.path.getmtime(latest_file) * 1000))
+        if new_latest_file_time != latest_file_time:
             replay_to_submit = latest_file
             break
 
@@ -63,14 +64,13 @@ def get_replay():
         replay_to_submit = get_late_replay(latest_file_time)
 
     if replay_to_submit is not None:
-        success_beep()
         submit_replay(replay_to_submit)
     else:
         failed_beep()
         print("Failed to find replay :(")
-
+        
     get_replay_lock = False
-
+    
 
 def create_score_model(replay):
     score_model = Score()
@@ -104,13 +104,20 @@ def create_score_model(replay):
 
 
 def submit_replay(replay):
-    parsed_replay = parse_replay_file(replay)
+    parsed_replay = None
+    try:
+        parsed_replay = parse_replay_file(replay)
+    except:
+        failed_beep()
+        print("Replay data is corrupt")
+        return
     if parsed_replay.game_mode != GameMode.Standard:
         failed_beep()
         print("Wrong game mode :(")
         return
     score_model = create_score_model(parsed_replay)
     print(score_model)
+    success_beep()
 
 
 keyboard.add_hotkey('ctrl+f2', get_replay)
