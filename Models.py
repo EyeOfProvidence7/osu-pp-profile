@@ -2,10 +2,35 @@ class Profile:
     def __init__(self):
         self.id = 0
         self.name = ''
+        self.ranked_pp = 0
+        self.unranked_pp = 0
+        self.total_pp = 0
+        self.rank = 0
+
+
+class Beatmap:
+    def __init__(self):
+        self.id = 0
+        self.creator = ''
+        self.approach_rate = 0
+        self.is_ranked = False
+        self.circle_size = 0
+        self.drain = 0
+        self.beatmap_id = 0
+        self.artist = ''
+        self.overall_difficulty = 0
+        self.total_length = 0
+        self.title = ''
+        self.bpm = 0
+        self.stars = 0
+        self.max_combo = 0
+        self.hit_length = 0
+        self.difficulty_name = ''
 
 
 class Score:
     def __init__(self):
+        self.id = 0
         self.beatmap_hash = ''
         self.player_name = ''
         self.number_300s = 0
@@ -29,6 +54,8 @@ class Score:
         self.spun_out = False
         self.auto_pilot = False
         self.perfect = False
+        self.beatmap_id = 0
+        self.profile_id = 0
 
     def __repr__(self):
         mods = []

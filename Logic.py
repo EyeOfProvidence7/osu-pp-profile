@@ -3,14 +3,18 @@ import time
 import os
 import glob
 import winsound
-from Models import Score
+import requests
+from Models import Score, Beatmap
+from Database import Database
 from osrparse import parse_replay_file
 from osrparse.enums import Mod, GameMode
 
-dir_path = 'D:/osu!/Replays/*'
+dir_path = 'E:/Games/osu!/Replays/*'
 replay_wait_period = 100
 replay_wait_timeout = 5000
-get_replay_lock = False
+submit_replay_lock = False
+osu_api_key = '50a9e71fb7203e281868a35e1f45e4236d62a7d1'
+database = Database()
 
 
 def success_beep():
@@ -52,29 +56,41 @@ def get_late_replay(latest_file_time):
 
 
 def get_replay():
-    global get_replay_lock
-    if get_replay_lock:
-        return
-    get_replay_lock = True
     list_of_files = glob.glob(dir_path)
     latest_file = max(list_of_files, key=os.path.getmtime)
     latest_file_time = int(round(os.path.getmtime(latest_file) * 1000))
-    replay_to_submit = get_early_replay(latest_file, latest_file_time)
+    replay = get_early_replay(latest_file, latest_file_time)
+    if replay is None:
+        replay = get_late_replay(latest_file_time)
+
+    return replay
+
+
+def submit_replay():
+    global submit_replay_lock
+    if submit_replay_lock:
+        return
+        submit_replay_lock = True
+
+    replay_to_submit = get_replay()
     if replay_to_submit is None:
-        replay_to_submit = get_late_replay(latest_file_time)
-
-    if replay_to_submit is not None:
-        submit_replay(replay_to_submit)
-    else:
         failed_beep()
-        print("Failed to find replay :(")
-        
-    get_replay_lock = False
+        print("Failed to find replay.")
+
+    try:
+        score_model = create_score_model(replay_to_submit)
+    except Exception as e:
+        failed_beep()
+        print("Failed to create score model. Exception: {0}".format(e))
+        return
+
+    success_beep()
+    submit_replay_lock = False
     
 
-def create_score_model(replay):
+def map_score_model(replay):
     score_model = Score()
-    
+
     score_model.beatmap_hash = replay.beatmap_hash
     score_model.player_name = replay.player_name
     score_model.number_300s = replay.number_300s
@@ -103,23 +119,54 @@ def create_score_model(replay):
     return score_model
 
 
-def submit_replay(replay):
-    parsed_replay = None
-    try:
-        parsed_replay = parse_replay_file(replay)
-    except:
-        failed_beep()
-        print("Replay data is corrupt")
-        return
+def map_beatmap_model(beatmap):
+    beatmap_model = Beatmap()
+
+    beatmap_model.creator = beatmap['creator']
+    beatmap_model.approach_rate = float(beatmap['diff_approach'])
+    beatmap_model.is_ranked = beatmap['approved'] == 1
+    beatmap_model.circle_size = float(beatmap['diff_size'])
+    beatmap_model.drain = float(beatmap['diff_drain'])
+    beatmap_model.beatmap_id = int(beatmap['beatmap_id'])
+    beatmap_model.artist = beatmap['artist']
+    beatmap_model.overall_difficulty = float(beatmap['diff_overall'])
+    beatmap_model.total_length = float(beatmap['total_length'])
+    beatmap_model.title = beatmap['title']
+    beatmap_model.bpm = float(beatmap['bpm'])
+    beatmap_model.stars = float(beatmap['difficultyrating'])
+    beatmap_model.max_combo = int(beatmap['max_combo'])
+    beatmap_model.hit_length = float(beatmap['hit_length'])
+    beatmap_model.difficulty_name = beatmap['version']
+
+    return beatmap_model
+
+
+def create_beatmap_model(beatmap_hash):
+    beatmap_url = "https://osu.ppy.sh/api/get_beatmaps?k={0}&h={1}".format(osu_api_key, beatmap_hash)
+    r = requests.get(beatmap_url)
+    if not r.json():
+        raise Exception("Beatmap not found.");
+
+    beatmap_json = r.json()[0]
+    beatmap_model = map_beatmap_model(beatmap_json)
+
+    return beatmap_model
+
+
+def create_score_model(replay):
+    parsed_replay = parse_replay_file(replay)
     if parsed_replay.game_mode != GameMode.Standard:
-        failed_beep()
-        print("Wrong game mode :(")
-        return
-    score_model = create_score_model(parsed_replay)
+        raise Exception('Only osu!standard game mode is supported.')
+
+    beatmap_model = create_beatmap_model(parsed_replay.beatmap_hash)
+
+    score_model = map_score_model(parsed_replay)
     print(score_model)
-    success_beep()
+
+    return score_model
 
 
-keyboard.add_hotkey('ctrl+f2', get_replay)
+keyboard.add_hotkey('ctrl+f2', submit_replay)
 
+print("PP Profile is running...")
 input()
