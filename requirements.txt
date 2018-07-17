@@ -1,0 +1,3 @@
+requests==2.19.1
+keyboard==0.13.2
+osrparse==3.0.0
