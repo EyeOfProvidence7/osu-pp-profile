@@ -4,7 +4,10 @@ import os
 import glob
 import winsound
 import requests
-from Models import Score, Beatmap
+import traceback
+import sys
+from pprint import pprint
+from Models import Score, Beatmap, Profile
 from Database import Database
 from osrparse import parse_replay_file
 from osrparse.enums import Mod, GameMode
@@ -14,7 +17,8 @@ replay_wait_period = 100
 replay_wait_timeout = 5000
 submit_replay_lock = False
 osu_api_key = '50a9e71fb7203e281868a35e1f45e4236d62a7d1'
-database = Database()
+database_file_name = 'osu-pp-profile.db'
+database = Database(database_file_name)
 
 
 def success_beep():
@@ -72,16 +76,29 @@ def submit_replay():
         return
         submit_replay_lock = True
 
-    replay_to_submit = get_replay()
+    try:
+        replay_to_submit = get_replay()
+    except PermissionError:
+        time.sleep(1)
+        replay_to_submit = get_replay()
+
     if replay_to_submit is None:
         failed_beep()
         print("Failed to find replay.")
 
     try:
-        score_model = create_score_model(replay_to_submit)
-    except Exception as e:
+        parsed_replay = parse_replay_file(replay_to_submit)
+        if parsed_replay.game_mode != GameMode.Standard:
+            raise Exception('Only osu!standard game mode is supported.')
+
+        beatmap = get_or_create_beatmap(parsed_replay.beatmap_hash)
+        profile = get_or_create_profile(parsed_replay.player_name)
+        score = get_or_create_or_update_score(parsed_replay, beatmap.id, profile.id)
+        pprint(vars(score))
+        # ToDo: update_profile(profile)
+    except:
         failed_beep()
-        print("Failed to create score model. Exception: {0}".format(e))
+        traceback.print_exc(file=sys.stdout)
         return
 
     success_beep()
@@ -124,7 +141,7 @@ def map_beatmap_model(beatmap):
 
     beatmap_model.creator = beatmap['creator']
     beatmap_model.approach_rate = float(beatmap['diff_approach'])
-    beatmap_model.is_ranked = beatmap['approved'] == 1
+    beatmap_model.is_ranked = beatmap['approved'] == '1'
     beatmap_model.circle_size = float(beatmap['diff_size'])
     beatmap_model.drain = float(beatmap['diff_drain'])
     beatmap_model.beatmap_id = int(beatmap['beatmap_id'])
@@ -141,7 +158,7 @@ def map_beatmap_model(beatmap):
     return beatmap_model
 
 
-def create_beatmap_model(beatmap_hash):
+def get_or_create_beatmap(beatmap_hash):
     beatmap_url = "https://osu.ppy.sh/api/get_beatmaps?k={0}&h={1}".format(osu_api_key, beatmap_hash)
     r = requests.get(beatmap_url)
     if not r.json():
@@ -149,21 +166,41 @@ def create_beatmap_model(beatmap_hash):
 
     beatmap_json = r.json()[0]
     beatmap_model = map_beatmap_model(beatmap_json)
+    beatmap_entity = database.get_beatmap_by_beatmap_id(beatmap_model.beatmap_id)
+    if not beatmap_entity:
+        beatmap_entity_id = database.create_beatmap(beatmap_model)
+        beatmap_entity = database.get_beatmap_by_id(beatmap_entity_id)
 
-    return beatmap_model
+    return beatmap_entity
 
 
-def create_score_model(replay):
-    parsed_replay = parse_replay_file(replay)
-    if parsed_replay.game_mode != GameMode.Standard:
-        raise Exception('Only osu!standard game mode is supported.')
+def get_or_create_profile(profile_name):
+    profile_model = Profile()
+    profile_model.name = profile_name
 
-    beatmap_model = create_beatmap_model(parsed_replay.beatmap_hash)
+    profile_entity = database.get_profile_by_name(profile_model.name)
+    if not profile_entity:
+        profile_entity_id = database.create_profile(profile_model)
+        profile_entity = database.get_profile_by_id(profile_entity_id)
 
-    score_model = map_score_model(parsed_replay)
-    print(score_model)
+    return profile_entity
 
-    return score_model
+
+def get_or_create_or_update_score(replay, beatmap_id, profile_id):
+    score_model = map_score_model(replay)
+    score_model.beatmap_id = beatmap_id
+    score_model.profile_id = profile_id
+    # Todo: score_model.pp = calculate_pp()
+
+    score_entity = database.get_score_by_beatmap_id_and_profile_id(beatmap_id, profile_id)
+    if score_entity and score_entity.pp < score_model.pp:
+        score_model.id = score_entity.id
+        database.update_score(score_model)
+    else:
+        score_entity_id = database.create_score(score_model)
+        score_entity = database.get_score_by_id(score_entity_id)
+
+    return score_entity
 
 
 keyboard.add_hotkey('ctrl+f2', submit_replay)

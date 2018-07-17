@@ -54,37 +54,6 @@ class Score:
         self.spun_out = False
         self.auto_pilot = False
         self.perfect = False
+        self.pp = 0
         self.beatmap_id = 0
         self.profile_id = 0
-
-    def __repr__(self):
-        mods = []
-        if self.no_fail:
-            mods.append("NF")
-        if self.easy:
-            mods.append("EZ")
-        if self.hidden:
-            mods.append("HD")
-        if self.hard_rock:
-            mods.append("HR")
-        if self.sudden_death:
-            mods.append("SD")
-        if self.double_time:
-            mods.append("DT")
-        if self.relax:
-            mods.append("RX")
-        if self.half_time:
-            mods.append("HT")
-        if self.flashlight:
-            mods.append("FL")
-        if self.spun_out:
-            mods.append("SO")
-        if self.auto_pilot:
-            mods.append("AP")
-        if self.perfect:
-            mods.append("PF")
-        mods_string = 'NoMod';
-        if mods.count != 0:
-            mods_string = ' '.join(mods)
-
-        return 'Mods: {0}'.format(mods_string)
