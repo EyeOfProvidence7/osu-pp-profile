@@ -88,6 +88,7 @@ def submit_replay():
     if replay_to_submit is None:
         failed_beep()
         print("Failed to find replay.")
+        submit_replay_lock = False
         return
 
     try:
@@ -98,6 +99,7 @@ def submit_replay():
     except:
         failed_beep()
         traceback.print_exc(file=sys.stdout)
+        submit_replay_lock = False
         return
 
     try:
@@ -111,6 +113,7 @@ def submit_replay():
     except:
         failed_beep()
         traceback.print_exc(file=sys.stdout)
+        submit_replay_lock = False
         return
 
     success_beep()
