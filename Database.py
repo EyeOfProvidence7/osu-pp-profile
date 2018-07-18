@@ -280,3 +280,27 @@ class Database:
         result = self.c.lastrowid
         self.conn.close()
         return result
+
+    def update_score(self, score_model):
+        self.conn = sqlite3.connect(self.database_file_name)
+        self.c = self.conn.cursor()
+        
+        sql = '''UPDATE scores SET beatmap_hash = ?, player_name = ?, number_300s = ?, number_100s = ?, number_50s = ?,
+            gekis = ?, katus = ?, misses = ?, score = ?, max_combo = ?, is_perfect_combo = ?, no_fail = ?, easy = ?,
+            hidden = ?, hard_rock = ?, sudden_death = ?, double_time = ?, relax = ?, half_time = ?, flashlight = ?, 
+            spun_out = ?, auto_pilot = ?, perfect = ?, pp = ?, beatmap_id = ?, profile_id = ?
+            WHERE id = ? '''
+
+        self.c.execute(sql, (score_model.beatmap_hash, score_model.player_name, score_model.number_300s,
+                             score_model.number_100s, score_model.number_50s, score_model.gekis, score_model.katus,
+                             score_model.misses, score_model.score, score_model.max_combo, score_model.is_perfect_combo,
+                             score_model.no_fail, score_model.easy, score_model.hidden, score_model.hard_rock,
+                             score_model.sudden_death, score_model.double_time, score_model.relax,
+                             score_model.half_time, score_model.flashlight, score_model.spun_out,
+                             score_model.auto_pilot, score_model.perfect, score_model.pp, score_model.beatmap_id,
+                             score_model.profile_id, score_model.id))
+
+        self.conn.commit()
+        result = self.c.lastrowid
+        self.conn.close()
+        return result

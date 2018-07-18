@@ -196,6 +196,7 @@ def get_or_create_or_update_score(replay, beatmap_id, profile_id):
     if score_entity and score_entity.pp < score_model.pp:
         score_model.id = score_entity.id
         database.update_score(score_model)
+        score_entity = score_model
     else:
         score_entity_id = database.create_score(score_model)
         score_entity = database.get_score_by_id(score_entity_id)
