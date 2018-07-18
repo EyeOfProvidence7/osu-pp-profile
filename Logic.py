@@ -88,9 +88,17 @@ def submit_replay():
 
     try:
         parsed_replay = parse_replay_file(replay_to_submit)
+    except PermissionError:
+        time.sleep(1)
+        parsed_replay = parse_replay_file(replay_to_submit)
+    except:
+        failed_beep()
+        traceback.print_exc(file=sys.stdout)
+        return
+
+    try:
         if parsed_replay.game_mode != GameMode.Standard:
             raise Exception('Only osu!standard game mode is supported.')
-
         beatmap = get_or_create_beatmap(parsed_replay.beatmap_hash)
         profile = get_or_create_profile(parsed_replay.player_name)
         score = get_or_create_or_update_score(parsed_replay, beatmap.id, profile.id)
@@ -193,13 +201,13 @@ def get_or_create_or_update_score(replay, beatmap_id, profile_id):
     # Todo: score_model.pp = calculate_pp()
 
     score_entity = database.get_score_by_beatmap_id_and_profile_id(beatmap_id, profile_id)
-    if score_entity and score_entity.pp < score_model.pp:
+    if not score_entity:
+        score_entity_id = database.create_score(score_model)
+        score_entity = database.get_score_by_id(score_entity_id)
+    elif score_entity.pp < score_model.pp:
         score_model.id = score_entity.id
         database.update_score(score_model)
         score_entity = score_model
-    else:
-        score_entity_id = database.create_score(score_model)
-        score_entity = database.get_score_by_id(score_entity_id)
 
     return score_entity
 
