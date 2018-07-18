@@ -68,6 +68,7 @@ class Database:
                 pp REAL,
                 beatmap_id INTEGER,
                 profile_id INTEGER,
+                accuracy REAL,
                 FOREIGN KEY(beatmap_id) REFERENCES beatmaps(id),
                 FOREIGN KEY(profile_id) REFERENCES profiles(id)
             )
@@ -230,6 +231,7 @@ class Database:
             score.pp = float(row[24])
             score.beatmap_id = int(row[25])
             score.profile_id = int(row[26])
+            score.accuracy = float(row[27])
 
             scores.append(score)
 
@@ -264,8 +266,8 @@ class Database:
         sql = ''' 
             INSERT INTO scores(beatmap_hash,player_name,number_300s,number_100s,number_50s,gekis,katus,misses,score,
                 max_combo,is_perfect_combo,no_fail,easy,hidden,hard_rock,sudden_death,double_time,relax,half_time,
-                flashlight,spun_out,auto_pilot,perfect,pp,beatmap_id,profile_id)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                flashlight,spun_out,auto_pilot,perfect,pp,beatmap_id,profile_id,accuracy)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         '''
         self.c.execute(sql, (score_model.beatmap_hash, score_model.player_name, score_model.number_300s,
                              score_model.number_100s, score_model.number_50s, score_model.gekis, score_model.katus,
@@ -274,7 +276,7 @@ class Database:
                              score_model.sudden_death, score_model.double_time, score_model.relax,
                              score_model.half_time, score_model.flashlight, score_model.spun_out,
                              score_model.auto_pilot, score_model.perfect, score_model.pp, score_model.beatmap_id,
-                             score_model.profile_id))
+                             score_model.profile_id, score_model.accuracy))
 
         self.conn.commit()
         result = self.c.lastrowid
@@ -288,7 +290,7 @@ class Database:
         sql = '''UPDATE scores SET beatmap_hash = ?, player_name = ?, number_300s = ?, number_100s = ?, number_50s = ?,
             gekis = ?, katus = ?, misses = ?, score = ?, max_combo = ?, is_perfect_combo = ?, no_fail = ?, easy = ?,
             hidden = ?, hard_rock = ?, sudden_death = ?, double_time = ?, relax = ?, half_time = ?, flashlight = ?, 
-            spun_out = ?, auto_pilot = ?, perfect = ?, pp = ?, beatmap_id = ?, profile_id = ?
+            spun_out = ?, auto_pilot = ?, perfect = ?, pp = ?, beatmap_id = ?, profile_id = ?, accuracy = ?
             WHERE id = ? '''
 
         self.c.execute(sql, (score_model.beatmap_hash, score_model.player_name, score_model.number_300s,
@@ -298,7 +300,7 @@ class Database:
                              score_model.sudden_death, score_model.double_time, score_model.relax,
                              score_model.half_time, score_model.flashlight, score_model.spun_out,
                              score_model.auto_pilot, score_model.perfect, score_model.pp, score_model.beatmap_id,
-                             score_model.profile_id, score_model.id))
+                             score_model.profile_id, score_model.accuracy, score_model.id))
 
         self.conn.commit()
         result = self.c.lastrowid

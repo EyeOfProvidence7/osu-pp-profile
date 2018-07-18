@@ -6,30 +6,33 @@ import winsound
 import requests
 import traceback
 import sys
+import pyttanko as osu
+import codecs
 from pprint import pprint
 from Models import Score, Beatmap, Profile
 from Database import Database
 from osrparse import parse_replay_file
 from osrparse.enums import Mod, GameMode
 
-dir_path = 'E:/Games/osu!/Replays/*'
+dir_path = 'D:/osu!/Replays/*'  # 'E:/Games/osu!/Replays/*'
 replay_wait_period = 100
 replay_wait_timeout = 5000
 submit_replay_lock = False
-osu_api_key = '50a9e71fb7203e281868a35e1f45e4236d62a7d1'
+osu_api_key = '46de654115045a6e159919ebbc3f66a40fee404a'
+temp_beatmap_name = "workaround.osu"
 database_file_name = 'osu-pp-profile.db'
 database = Database(database_file_name)
 
 
 def success_beep():
-    frequency = 800  # Set Frequency To 2500 Hertz
-    duration = 250  # Set Duration To 1000 ms == 1 second
+    frequency = 800
+    duration = 250
     winsound.Beep(frequency, duration)
 
 
 def failed_beep():
-    frequency = 200  # Set Frequency To 2500 Hertz
-    duration = 250  # Set Duration To 1000 ms == 1 second
+    frequency = 200
+    duration = 250
     winsound.Beep(frequency, duration)
 
 
@@ -74,7 +77,7 @@ def submit_replay():
     global submit_replay_lock
     if submit_replay_lock:
         return
-        submit_replay_lock = True
+    submit_replay_lock = True
 
     try:
         replay_to_submit = get_replay()
@@ -85,6 +88,7 @@ def submit_replay():
     if replay_to_submit is None:
         failed_beep()
         print("Failed to find replay.")
+        return
 
     try:
         parsed_replay = parse_replay_file(replay_to_submit)
@@ -101,7 +105,7 @@ def submit_replay():
             raise Exception('Only osu!standard game mode is supported.')
         beatmap = get_or_create_beatmap(parsed_replay.beatmap_hash)
         profile = get_or_create_profile(parsed_replay.player_name)
-        score = get_or_create_or_update_score(parsed_replay, beatmap.id, profile.id)
+        score = get_or_create_or_update_score(parsed_replay, beatmap, profile)
         pprint(vars(score))
         # ToDo: update_profile(profile)
     except:
@@ -194,13 +198,14 @@ def get_or_create_profile(profile_name):
     return profile_entity
 
 
-def get_or_create_or_update_score(replay, beatmap_id, profile_id):
+def get_or_create_or_update_score(replay, beatmap, profile):
     score_model = map_score_model(replay)
-    score_model.beatmap_id = beatmap_id
-    score_model.profile_id = profile_id
-    # Todo: score_model.pp = calculate_pp()
+    score_model.beatmap_id = beatmap.id
+    score_model.profile_id = profile.id
+    score_model.pp, score_model.accuracy = calculate_score_pp(beatmap.beatmap_id, score_model)
 
-    score_entity = database.get_score_by_beatmap_id_and_profile_id(beatmap_id, profile_id)
+    score_entity = database.get_score_by_beatmap_id_and_profile_id(beatmap.id, profile.id)
+
     if not score_entity:
         score_entity_id = database.create_score(score_model)
         score_entity = database.get_score_by_id(score_entity_id)
@@ -210,6 +215,27 @@ def get_or_create_or_update_score(replay, beatmap_id, profile_id):
         score_entity = score_model
 
     return score_entity
+
+
+def calculate_score_pp(beatmap_id, score):
+    p = osu.parser()
+    beatmap_url = "https://osu.ppy.sh/osu/{0}".format(beatmap_id)
+    beatmap_raw = requests.get(beatmap_url).text
+    f = codecs.open(temp_beatmap_name, "w+", "utf-8")
+    f.write(beatmap_raw)
+    f.close()
+    f = codecs.open(temp_beatmap_name, encoding="utf-8")
+    clean_beatmap = p.map(f)
+    f.close()
+    os.remove(temp_beatmap_name)
+
+    stars = osu.diff_calc().calc(clean_beatmap, osu.mods_from_str(score.get_mods_string()))
+
+    pp, _, _, _, acc = osu.ppv2(aim_stars=stars.aim, speed_stars=stars.speed, bmap=clean_beatmap,
+                                mods=osu.mods_from_str(score.get_mods_string()), combo=score.max_combo,
+                                n300=score.number_300s, n100=score.number_100s, n50=score.number_50s,
+                                nmiss=score.misses)
+    return pp, acc
 
 
 keyboard.add_hotkey('ctrl+f2', submit_replay)
