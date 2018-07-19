@@ -91,8 +91,7 @@ class Logic:
             beatmap = self.get_or_create_beatmap(parsed_replay.beatmap_hash)
             profile = self.get_or_create_profile(parsed_replay.player_name)
             score = self.get_or_create_or_update_score(parsed_replay, beatmap, profile)
-            pprint(vars(score))
-            # ToDo: update_profile(profile)
+            self.update_profile(profile)
         except:
             traceback.print_exc(file=sys.stdout)
             Logic.submit_replay_lock = False
@@ -167,6 +166,9 @@ class Logic:
 
         return beatmap_entity
 
+    def get_beatmap(self, beatmap_id):
+        return Logic.database.get_beatmap_by_id(beatmap_id)
+
     def get_or_create_profile(self, profile_name):
         profile_model = Profile()
         profile_model.name = profile_name
@@ -177,6 +179,40 @@ class Logic:
             profile_entity = Logic.database.get_profile_by_id(profile_entity_id)
 
         return profile_entity
+
+    def update_profile(self, profile):
+        scores = Logic.database.get_scores_by_profile_id(profile.id)
+        scores.sort(key=lambda x: x.pp, reverse=True)
+
+        unranked_scores = []
+        ranked_scores = []
+
+        for score in scores:
+            beatmap = Logic.database.get_beatmap_by_id(score.beatmap_id)
+            if beatmap.is_ranked:
+                ranked_scores.append(score)
+            else:
+                unranked_scores.append(score)
+
+        profile.ranked_pp = self.calculate_scores_pp(ranked_scores)
+        profile.unranked_pp = self.calculate_scores_pp(unranked_scores)
+        profile.total_pp = self.calculate_scores_pp(scores)
+
+        Logic.database.update_profile(profile)
+
+    def calculate_scores_pp(self, scores):
+        weighted_pp = 0
+
+        for i in range(len(scores)):
+            weighted_pp += scores[i].pp * (0.95 ** i)
+
+        bonus_pp = 416.6667 * (1 - (0.9994 ** (len(scores))))
+        print(f"weighted_pp: {weighted_pp}, bonus_pp: {bonus_pp}")
+        return weighted_pp + bonus_pp
+
+    def get_profiles_sorted_by_total_pp(self):
+        profiles = Logic.database.get_all_profiles()
+        return sorted(profiles, key=lambda x: x.total_pp, reverse=True)
 
     def get_or_create_or_update_score(self, replay, beatmap, profile):
         score_model = self.map_score_model(replay)
@@ -215,3 +251,10 @@ class Logic:
                                     n300=score.number_300s, n100=score.number_100s, n50=score.number_50s,
                                     nmiss=score.misses)
         return pp, acc
+
+    def get_scores_by_profile_id(self, profile_id):
+        scores = Logic.database.get_scores_by_profile_id(profile_id)
+        return sorted(scores, key=lambda x: x.pp, reverse=True)
+
+
+

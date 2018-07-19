@@ -183,6 +183,15 @@ class Database:
             return profiles[0]
         return profiles
 
+    def get_all_profiles(self):
+        self.conn = sqlite3.connect(self.database_file_name)
+        self.c = self.conn.cursor()
+        self.c.execute("select * from profiles")
+        query_result = self.c.fetchall()
+        profiles = self.map_profile_query_result(query_result)
+        self.conn.close()
+        return profiles
+
     def create_profile(self, profile_model):
         self.conn = sqlite3.connect(self.database_file_name)
         self.c = self.conn.cursor()
@@ -198,6 +207,19 @@ class Database:
         result = self.c.lastrowid
         self.conn.close()
         return result
+
+    def update_profile(self, profile):
+        self.conn = sqlite3.connect(self.database_file_name)
+        self.c = self.conn.cursor()
+
+        sql = '''UPDATE profiles SET name = ?, ranked_pp = ?, unranked_pp = ?, total_pp = ?, rank = ?
+            WHERE id = ? '''
+
+        self.c.execute(sql, (profile.name, profile.ranked_pp, profile.unranked_pp, profile.total_pp, profile.rank,
+                             profile.id))
+
+        self.conn.commit()
+        self.conn.close()
 
     def map_score_query_result(self, query_result):
         scores = []
@@ -246,6 +268,15 @@ class Database:
         self.conn.close()
         if scores:
             return scores[0]
+        return
+
+    def get_scores_by_profile_id(self, profile_id):
+        self.conn = sqlite3.connect(self.database_file_name)
+        self.c = self.conn.cursor()
+        self.c.execute("select * from scores where profile_id = {0}".format(profile_id))
+        query_result = self.c.fetchall()
+        scores = self.map_score_query_result(query_result)
+        self.conn.close()
         return scores
 
     def get_score_by_id(self, id):
@@ -303,6 +334,5 @@ class Database:
                              score_model.profile_id, score_model.accuracy, score_model.id))
 
         self.conn.commit()
-        result = self.c.lastrowid
         self.conn.close()
-        return result
+
