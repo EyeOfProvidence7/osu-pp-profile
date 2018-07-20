@@ -1,5 +1,5 @@
 requests==2.19.1
-tabulate==0.8.2
-pyttanko==1.0.22
 keyboard==0.13.2
 osrparse==3.0.0
+pyttanko==1.0.22
+tabulate==0.8.2
