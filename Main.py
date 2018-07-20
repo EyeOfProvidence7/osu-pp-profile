@@ -23,9 +23,10 @@ def failed_beep():
 
 
 def submit_replay():
-    success = logic.submit_replay()
-    if success:
+    score, latest_pp = logic.submit_replay()
+    if score:
         success_beep()
+        display_score(score, latest_pp)
     else:
         failed_beep()
 
@@ -65,6 +66,11 @@ def display_profile_details(profile):
         score_rows.append([f"{beatmap.title} [{beatmap.difficulty_name}]", score.accuracy,
                            f"{score.max_combo}/{beatmap.max_combo}", score.misses, beatmap.is_ranked, score.pp])
     print(tabulate(score_rows, headers=headers, tablefmt='orgtbl'))
+
+
+def display_score(score, latest_pp):
+    beatmap = logic.get_beatmap(score.beatmap_id)
+    print(f"New {score.player_name} score: {beatmap.title} [{beatmap.difficulty_name}], pp: {round(latest_pp, 2)}, best pp: {round(score.pp)}")
 
 
 keyboard.add_hotkey('ctrl+shift+f2', submit_replay)
