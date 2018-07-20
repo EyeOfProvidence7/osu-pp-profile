@@ -61,7 +61,7 @@ class Logic:
 
     def submit_replay(self):
         if Logic.submit_replay_lock:
-            return False
+            return None
         Logic.submit_replay_lock = True
 
         try:
@@ -73,7 +73,7 @@ class Logic:
         if replay_to_submit is None:
             print("Failed to find replay.")
             Logic.submit_replay_lock = False
-            return False
+            return None
 
         try:
             parsed_replay = parse_replay_file(replay_to_submit)
@@ -83,7 +83,7 @@ class Logic:
         except:
             traceback.print_exc(file=sys.stdout)
             Logic.submit_replay_lock = False
-            return False
+            return None
 
         try:
             if parsed_replay.game_mode != GameMode.Standard:
@@ -95,10 +95,12 @@ class Logic:
         except:
             traceback.print_exc(file=sys.stdout)
             Logic.submit_replay_lock = False
-            return False
+            return None
 
         Logic.submit_replay_lock = False
-        return True
+        latest_score = self.map_score_model(parsed_replay)
+        latest_pp, _ = self.calculate_score_pp(beatmap.beatmap_id, latest_score)
+        return score, latest_pp
 
     def map_score_model(self, replay):
         score_model = Score()
