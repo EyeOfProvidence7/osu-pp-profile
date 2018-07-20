@@ -84,14 +84,13 @@ class Logic:
             traceback.print_exc(file=sys.stdout)
             Logic.submit_replay_lock = False
             return None
-
         try:
             if parsed_replay.game_mode != GameMode.Standard:
                 raise Exception('Only osu!standard game mode is supported.')
             beatmap = self.get_or_create_beatmap(parsed_replay.beatmap_hash)
             profile = self.get_or_create_profile(parsed_replay.player_name)
             score = self.get_or_create_or_update_score(parsed_replay, beatmap, profile)
-            self.update_profile(profile)
+            ranked_pp_obtained, total_pp_obtained = self.update_profile(profile)
         except:
             traceback.print_exc(file=sys.stdout)
             Logic.submit_replay_lock = False
@@ -100,7 +99,7 @@ class Logic:
         Logic.submit_replay_lock = False
         latest_score = self.map_score_model(parsed_replay)
         latest_pp, _ = self.calculate_score_pp(beatmap.beatmap_id, latest_score)
-        return score, latest_pp
+        return score, latest_pp, ranked_pp_obtained, total_pp_obtained
 
     def map_score_model(self, replay):
         score_model = Score()
@@ -137,7 +136,7 @@ class Logic:
 
         beatmap_model.creator = beatmap['creator']
         beatmap_model.approach_rate = float(beatmap['diff_approach'])
-        beatmap_model.is_ranked = beatmap['approved'] == '1'
+        beatmap_model.is_ranked = beatmap['approved'] in ['1', '2']
         beatmap_model.circle_size = float(beatmap['diff_size'])
         beatmap_model.drain = float(beatmap['diff_drain'])
         beatmap_model.beatmap_id = int(beatmap['beatmap_id'])
@@ -182,6 +181,7 @@ class Logic:
 
         return profile_entity
 
+    #Returns extra total and ranked pp obtained
     def update_profile(self, profile):
         scores = Logic.database.get_scores_by_profile_id(profile.id)
         scores.sort(key=lambda x: x.pp, reverse=True)
@@ -196,11 +196,15 @@ class Logic:
             else:
                 unranked_scores.append(score)
 
+        previous_pp = profile.total_pp
+        previous_ranked_pp = profile.ranked_pp
         profile.ranked_pp = self.calculate_scores_pp(ranked_scores)
         profile.unranked_pp = self.calculate_scores_pp(unranked_scores)
         profile.total_pp = self.calculate_scores_pp(scores)
 
         Logic.database.update_profile(profile)
+
+        return profile.ranked_pp - previous_ranked_pp, profile.total_pp - previous_pp
 
     def calculate_scores_pp(self, scores):
         weighted_pp = 0
