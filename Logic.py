@@ -207,7 +207,6 @@ class Logic:
             weighted_pp += scores[i].pp * (0.95 ** i)
 
         bonus_pp = 416.6667 * (1 - (0.9994 ** (len(scores))))
-        print(f"weighted_pp: {weighted_pp}, bonus_pp: {bonus_pp}")
         return weighted_pp + bonus_pp
 
     def get_profiles_sorted_by_total_pp(self):
