@@ -90,7 +90,7 @@ class Logic:
             beatmap = self.get_or_create_beatmap(parsed_replay.beatmap_hash)
             profile = self.get_or_create_profile(parsed_replay.player_name)
             score = self.get_or_create_or_update_score(parsed_replay, beatmap, profile)
-            ranked_pp_obtained, total_pp_obtained = self.update_profile(profile)
+            ranked_pp_obtained, total_pp_obtained, ranks_increased = self.update_profile(profile)
         except:
             traceback.print_exc(file=sys.stdout)
             Logic.submit_replay_lock = False
@@ -98,8 +98,8 @@ class Logic:
 
         Logic.submit_replay_lock = False
         latest_score = self.map_score_model(parsed_replay)
-        latest_pp, _ = self.calculate_score_pp(beatmap.beatmap_id, latest_score)
-        return score, latest_pp, ranked_pp_obtained, total_pp_obtained
+        latest_pp, latest_score_acc = self.calculate_score_pp(beatmap.beatmap_id, latest_score)
+        return score, latest_score, latest_score_acc, latest_pp, ranked_pp_obtained, total_pp_obtained, ranks_increased
 
     def map_score_model(self, replay):
         score_model = Score()
@@ -198,13 +198,15 @@ class Logic:
 
         previous_pp = profile.total_pp
         previous_ranked_pp = profile.ranked_pp
+        previous_rank = profile.rank
         profile.ranked_pp = self.calculate_scores_pp(ranked_scores)
         profile.unranked_pp = self.calculate_scores_pp(unranked_scores)
         profile.total_pp = self.calculate_scores_pp(scores)
+        profile.rank = self.get_rank(profile.ranked_pp)
 
         Logic.database.update_profile(profile)
 
-        return profile.ranked_pp - previous_ranked_pp, profile.total_pp - previous_pp
+        return profile.ranked_pp - previous_ranked_pp, profile.total_pp - previous_pp, previous_rank - profile.rank
 
     def calculate_scores_pp(self, scores):
         weighted_pp = 0
@@ -256,6 +258,10 @@ class Logic:
                                     n300=score.number_300s, n100=score.number_100s, n50=score.number_50s,
                                     nmiss=score.misses)
         return pp, acc
+
+    def get_rank(self, pp):
+        rank = int(requests.get(f"https://osudaily.net/data/getPPRank.php?t=pp&v={pp}&m=0").text)
+        return rank
 
     def get_scores_by_profile_id(self, profile_id):
         scores = Logic.database.get_scores_by_profile_id(profile_id)
