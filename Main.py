@@ -136,7 +136,7 @@ def display_score(score, latest_score, latest_score_acc, latest_pp, ranked_pp_ob
 
 def import_profile(profile_name):
     logic.import_profile(profile_name)
-    logic.extrapolate_rest_of_scores("Hydro7")
+    logic.extrapolate_rest_of_scores(profile_name)
 
 
 keyboard.add_hotkey('ctrl+shift+f2', submit_replay)
