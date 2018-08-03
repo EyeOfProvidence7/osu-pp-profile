@@ -131,6 +131,25 @@ class Logic:
 
         return score_model
 
+    def map_score_model_from_profile_score(self, score, player_name):
+        score_model = Score()
+
+        score_model.player_name = player_name
+        score_model.number_300s = score['count300']
+        score_model.number_100s = score['count100']
+        score_model.number_50s = score['count50']
+        score_model.gekis = score['countgeki']
+        score_model.katus = score['countkatu']
+        score_model.misses = score['countmiss']
+        score_model.score = score['score']
+        score_model.max_combo = score['maxcombo']
+        score_model.is_perfect_combo = score['perfect'] == "1"
+        score_model.profile_id = score['user_id']
+        score_model.pp = float(score['pp'])
+
+        return score_model
+
+
     def map_beatmap_model(self, beatmap):
         beatmap_model = Beatmap()
 
@@ -154,6 +173,21 @@ class Logic:
 
     def get_or_create_beatmap(self, beatmap_hash):
         beatmap_url = "https://osu.ppy.sh/api/get_beatmaps?k={0}&h={1}".format(self.osu_api_key, beatmap_hash)
+        r = requests.get(beatmap_url)
+        if not r.json():
+            raise Exception("Beatmap not found.");
+
+        beatmap_json = r.json()[0]
+        beatmap_model = self.map_beatmap_model(beatmap_json)
+        beatmap_entity = Logic.database.get_beatmap_by_beatmap_id(beatmap_model.beatmap_id)
+        if not beatmap_entity:
+            beatmap_entity_id = Logic.database.create_beatmap(beatmap_model)
+            beatmap_entity = Logic.database.get_beatmap_by_id(beatmap_entity_id)
+
+        return beatmap_entity
+
+    def get_or_create_beatmap_by_osu_beatmap_id(self, beatmap_id):
+        beatmap_url = "https://osu.ppy.sh/api/get_beatmaps?k={0}&b={1}".format(self.osu_api_key, beatmap_id)
         r = requests.get(beatmap_url)
         if not r.json():
             raise Exception("Beatmap not found.");
@@ -191,10 +225,11 @@ class Logic:
 
         for score in scores:
             beatmap = Logic.database.get_beatmap_by_id(score.beatmap_id)
-            if beatmap.is_ranked:
-                ranked_scores.append(score)
-            else:
-                unranked_scores.append(score)
+            if beatmap:
+                if beatmap.is_ranked:
+                    ranked_scores.append(score)
+                else:
+                    unranked_scores.append(score)
 
         previous_pp = profile.total_pp
         previous_ranked_pp = profile.ranked_pp
@@ -207,6 +242,22 @@ class Logic:
         Logic.database.update_profile(profile)
 
         return profile.ranked_pp - previous_ranked_pp, profile.total_pp - previous_pp, previous_rank - profile.rank
+
+    #used to update profile after importing
+    def update_profile2(self, profile):
+        scores = Logic.database.get_scores_by_profile_id(profile.id)
+        scores.sort(key=lambda x: x.pp, reverse=True)
+
+        ranked_scores = []
+
+        for score in scores:
+            ranked_scores.append(score)
+
+        profile.ranked_pp = self.calculate_scores_pp(ranked_scores)
+        profile.total_pp = self.calculate_scores_pp(scores)
+        profile.rank = self.get_rank(profile.ranked_pp)
+
+        Logic.database.update_profile(profile)
 
     def calculate_scores_pp(self, scores):
         weighted_pp = 0
@@ -228,6 +279,21 @@ class Logic:
         score_model.pp, score_model.accuracy = self.calculate_score_pp(beatmap.beatmap_id, score_model)
 
         score_entity = Logic.database.get_score_by_beatmap_id_and_profile_id(beatmap.id, profile.id)
+
+        if not score_entity:
+            score_entity_id = Logic.database.create_score(score_model)
+            score_entity = Logic.database.get_score_by_id(score_entity_id)
+        elif score_entity.pp < score_model.pp:
+            score_model.id = score_entity.id
+            Logic.database.update_score(score_model)
+            score_entity = score_model
+
+        return score_entity
+
+    def create_score_from_profile(self, score_model, beatmap_id, profile):
+        score_model.beatmap_id = beatmap_id
+        score_model.profile_id = profile.id
+        score_entity = Logic.database.get_score_by_beatmap_id_and_profile_id(beatmap_id, score_model.profile_id)
 
         if not score_entity:
             score_entity_id = Logic.database.create_score(score_model)
@@ -266,6 +332,55 @@ class Logic:
     def get_scores_by_profile_id(self, profile_id):
         scores = Logic.database.get_scores_by_profile_id(profile_id)
         return sorted(scores, key=lambda x: x.pp, reverse=True)
+
+    def import_profile(self, profile_name):
+        user = self.get_user_score_list_from_osu(profile_name)
+        best_score_list = user.json()
+        profile = self.get_or_create_profile(profile_name)
+        for score in best_score_list:
+            score_model = self.map_score_model_from_profile_score(score, profile_name)
+            beatmap = self.get_or_create_beatmap_by_osu_beatmap_id(score['beatmap_id'])
+            score_model_from_db = self.create_score_from_profile(score_model, beatmap.id, profile)
+        self.update_profile2(profile)
+
+    def extrapolate_rest_of_scores(self, profile_name):
+        user = self.get_user_from_osu(profile_name)
+        user = user.json()[0]
+        profile = self.get_or_create_profile(profile_name)
+        scores = self.get_scores_by_profile_id(profile.id)
+        last_score = scores[-1]
+        last_score_pp = last_score.pp
+
+        while profile.ranked_pp < float(user['pp_raw']):
+            if last_score_pp > 0:
+                last_score_pp -= 0.20
+            score = Score()
+            score.profile_id = profile.id
+            score.player_name = profile_name
+            score.pp = last_score_pp
+            Logic.database.create_score(score)
+            self.update_profile2(profile)
+
+
+
+    def get_user_score_list_from_osu(self, profile_name):
+        user_scores_url = f"https://osu.ppy.sh/api/get_user_best?k={self.osu_api_key}&u={profile_name}&limit=100&type=string"
+        user = requests.get(user_scores_url)
+        if not user.json():
+            raise Exception("User scores not found.")
+        return user
+
+    def get_user_from_osu(self, profile_name):
+        user_url = f"https://osu.ppy.sh/api/get_user?k={self.osu_api_key}&u={profile_name}&type=string"
+        user = requests.get(user_url)
+        if not user.json():
+            raise Exception("User not found.")
+        return user
+
+
+
+
+
 
 
 

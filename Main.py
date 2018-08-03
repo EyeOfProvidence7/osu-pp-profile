@@ -40,16 +40,24 @@ def submit_replay():
 def start_ui():
     global profiles
     program_running = True
+    selected_profile = None
     while program_running:
+        print("NOTE: When picking a profile, type 99 to import a profile from osu (DANGER, SHIT IMPLEMENTATION, BACKUP YOUR DB)")
         update_profiles()
         display_profile_list()
         choice = input()
-        if choice.isnumeric() and 0 <= int(choice) < len(profiles):
-            selected_profile = logic.get_or_create_profile(profiles[int(choice)].name)
+        if choice.isnumeric():
+            if 0 <= int(choice) < len(profiles):
+                selected_profile = logic.get_or_create_profile(profiles[int(choice)].name)
+            elif int(choice) == 99:
+                print("Type a profile name to import: ", end="")
+                profile_name = input()
+                import_profile(profile_name)
         else:
             continue
         print()
-        display_profile_details(selected_profile)
+        if selected_profile:
+            display_profile_details(selected_profile)
         print()
 
 
@@ -78,9 +86,19 @@ def display_profile_details(profile):
     print("Press enter to load more scores (if available), or input 0 to go back")
     for score in scores:
         beatmap = logic.get_beatmap(score.beatmap_id)
+        beatmap_title = ""
+        beatmap_difficulty_name = ""
+        beatmap_max_combo = ""
+        beatmap_is_ranked = ""
+        if beatmap:
+            beatmap_title = beatmap.title
+            beatmap_difficulty_name = beatmap.difficulty_name
+            beatmap_max_combo = beatmap.max_combo
+            beatmap_is_ranked = beatmap.is_ranked
+
         num_scores_shown += 1
-        score_rows.append([num_scores_shown, f"{beatmap.title} [{beatmap.difficulty_name}]", round(score.accuracy, 2),
-                           f"{score.max_combo}/{beatmap.max_combo}", score.misses, beatmap.is_ranked,
+        score_rows.append([num_scores_shown, f"{beatmap_title} [{beatmap_difficulty_name}]", round(score.accuracy, 2),
+                           f"{score.max_combo}/{beatmap_max_combo}", score.misses, beatmap_is_ranked,
                            round(score.pp, 2)])
         if num_scores_shown == len_scores:
             print(tabulate(score_rows, headers=headers, tablefmt='orgtbl'))
@@ -101,6 +119,7 @@ def update_profiles():
 def display_score(score, latest_score, latest_score_acc, latest_pp, ranked_pp_obtained, total_pp_obtained, ranks_obtained):
     beatmap = logic.get_beatmap(score.beatmap_id)
     mods = ""
+    score_mods = ""
     if score.get_mods_string() != "":
         score_mods = f" +{score.get_mods_string()}"
     if latest_score.get_mods_string() != "":
@@ -113,6 +132,11 @@ def display_score(score, latest_score, latest_score_acc, latest_pp, ranked_pp_ob
           f"Best score pp: {round(score.pp, 2)} (total: +{round(total_pp_obtained, 2)}"
           f" , ranked: +{round(ranked_pp_obtained, 2)}) ")
     print(f"Ranks obtained: {ranks_obtained}")
+
+
+def import_profile(profile_name):
+    logic.import_profile(profile_name)
+    logic.extrapolate_rest_of_scores("Hydro7")
 
 
 keyboard.add_hotkey('ctrl+shift+f2', submit_replay)
