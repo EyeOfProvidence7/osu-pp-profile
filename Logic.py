@@ -230,6 +230,8 @@ class Logic:
                     ranked_scores.append(score)
                 else:
                     unranked_scores.append(score)
+            else:
+                ranked_scores.append(score) #I know this to work because extrapolated scores don't have a beatmap and I'll make sure not to submit
 
         previous_pp = profile.total_pp
         previous_ranked_pp = profile.ranked_pp
