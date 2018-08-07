@@ -354,14 +354,15 @@ class Logic:
         last_score_pp = last_score.pp
 
         while profile.ranked_pp < float(user['pp_raw']):
-            if last_score_pp > 0:
-                last_score_pp -= 0.20
+            if last_score_pp > 0.3:
+                last_score_pp -= 0.3
             score = Score()
             score.profile_id = profile.id
             score.player_name = profile_name
             score.pp = last_score_pp
             Logic.database.create_score(score)
             self.update_profile2(profile)
+            print(profile.ranked_pp)
 
 
 

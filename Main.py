@@ -7,7 +7,7 @@ from tabulate import tabulate
 
 dir_path = 'D:/osu!/Replays/*'  # 'E:/Games/osu!/Replays/*'
 osu_api_key = '46de654115045a6e159919ebbc3f66a40fee404a'
-profile_scores_count = 15
+profile_scores_count = 25
 logic = Logic(dir_path, osu_api_key)
 profiles = logic.get_profiles_sorted_by_total_pp()
 
@@ -77,7 +77,7 @@ def display_profile_details(profile):
     print(f"Unranked PP: {round(profile.unranked_pp)}")
     print(f"Rank: {round(profile.rank)}")
     print()
-    headers = ["Rank", "Title", "Acc", "Combo", "Miss", "Ranked", "PP"]
+    headers = ["Rank", "Title", "Acc-Combo-Miss", "PP"]
     score_rows = []
 
     scores = logic.get_scores_by_profile_id(profile.id)
@@ -86,6 +86,7 @@ def display_profile_details(profile):
     print("Press enter to load more scores (if available), or input 0 to go back")
     for score in scores:
         beatmap = logic.get_beatmap(score.beatmap_id)
+        beatmap_artist = ""
         beatmap_title = ""
         beatmap_difficulty_name = ""
         beatmap_max_combo = ""
@@ -95,10 +96,11 @@ def display_profile_details(profile):
             beatmap_difficulty_name = beatmap.difficulty_name
             beatmap_max_combo = beatmap.max_combo
             beatmap_is_ranked = beatmap.is_ranked
+            beatmap_artist = beatmap.artist
 
         num_scores_shown += 1
-        score_rows.append([num_scores_shown, f"{beatmap_title} [{beatmap_difficulty_name}]", round(score.accuracy, 2),
-                           f"{score.max_combo}/{beatmap_max_combo}", score.misses, beatmap_is_ranked,
+        score_rows.append([num_scores_shown, f"{beatmap_artist} - {beatmap_title} [{beatmap_difficulty_name}]",
+                           f"{round(score.accuracy, 2)}% - {score.max_combo}/{beatmap_max_combo} - {score.misses}",
                            round(score.pp, 2)])
         if num_scores_shown == len_scores:
             print(tabulate(score_rows, headers=headers, tablefmt='orgtbl'))
@@ -143,6 +145,7 @@ keyboard.add_hotkey('ctrl+shift+f2', submit_replay)
 
 print("PP Profile is running...")
 print()
+#import_profile("Hydro7")
 
 start_ui()
 
