@@ -7,10 +7,22 @@ from tabulate import tabulate
 
 dir_path = 'D:/osu!/Replays/*'  # 'E:/Games/osu!/Replays/*'
 osu_api_key = '46de654115045a6e159919ebbc3f66a40fee404a'
-profile_scores_count = 25
+profile_scores_count = 50
 logic = Logic(dir_path, osu_api_key)
 profiles = logic.get_profiles_sorted_by_total_pp()
+ranked_mode = True
 
+for profile in profiles:
+    logic.update_profile(profile)
+
+def switchMode():
+    global ranked_mode
+    if ranked_mode:
+        ranked_mode = False
+        print("Now showing unranked scores.")
+    else:
+        ranked_mode = True
+        print("Now showing ranked scores.")
 
 def success_beep():
     frequency = 800
@@ -53,6 +65,9 @@ def start_ui():
                 print("Type a profile name to import: ", end="")
                 profile_name = input()
                 import_profile(profile_name)
+            elif int(choice) == 999:
+                switchMode()
+                continue
         else:
             continue
         print()
@@ -97,20 +112,23 @@ def display_profile_details(profile):
             beatmap_max_combo = beatmap.max_combo
             beatmap_is_ranked = beatmap.is_ranked
             beatmap_artist = beatmap.artist
-
-        num_scores_shown += 1
         score_rows.append([num_scores_shown, f"{beatmap_artist} - {beatmap_title} [{beatmap_difficulty_name}]",
-                           f"{round(score.accuracy, 2)}% - {score.max_combo}/{beatmap_max_combo} - {score.misses}",
-                           round(score.pp, 2)])
+                f"{round(score.accuracy, 2)}% - {score.max_combo}/{beatmap_max_combo} - {score.misses}",
+                round(score.pp, 2)])           
+        num_scores_shown += 1
+
+            
+           
         if num_scores_shown == len_scores:
             print(tabulate(score_rows, headers=headers, tablefmt='orgtbl'))
             break
-        if num_scores_shown % profile_scores_count == 0:
+        if num_scores_shown % profile_scores_count == 0 and num_scores_shown != 0:
             print(tabulate(score_rows, headers=headers, tablefmt='orgtbl'))
             score_rows = []
             choice = input()
             if choice.isnumeric() and int(choice) == 0:
                 break
+    print(tabulate(score_rows, headers=headers, tablefmt='orgtbl'))
 
 
 def update_profiles():
@@ -126,6 +144,8 @@ def display_score(score, latest_score, latest_score_acc, latest_pp, ranked_pp_ob
         score_mods = f" +{score.get_mods_string()}"
     if latest_score.get_mods_string() != "":
         latest_score_mods = f" +{latest_score.get_mods_string()}"
+    else:
+        latest_score_mods = ""
     print(f"Best score: {beatmap.title} [{beatmap.difficulty_name}]{score_mods} "
           f"{round(score.accuracy, 2)}% {score.max_combo}/{beatmap.max_combo}")
     print(f"Current score: {beatmap.title} [{beatmap.difficulty_name}]{latest_score_mods} "

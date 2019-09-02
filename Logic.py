@@ -63,18 +63,16 @@ class Logic:
         if Logic.submit_replay_lock:
             return None
         Logic.submit_replay_lock = True
-
         try:
             replay_to_submit = self.get_replay()
         except PermissionError:
             time.sleep(1)
             replay_to_submit = self.get_replay()
-
         if replay_to_submit is None:
             print("Failed to find replay.")
             Logic.submit_replay_lock = False
             return None
-
+        
         try:
             parsed_replay = parse_replay_file(replay_to_submit)
         except PermissionError:
@@ -84,6 +82,8 @@ class Logic:
             traceback.print_exc(file=sys.stdout)
             Logic.submit_replay_lock = False
             return None
+        if parsed_replay.player_name == "osu!":
+            parsed_replay.player_name = "Hydro7"
         try:
             if parsed_replay.game_mode != GameMode.Standard:
                 raise Exception('Only osu!standard game mode is supported.')
@@ -257,7 +257,7 @@ class Logic:
 
         profile.ranked_pp = self.calculate_scores_pp(ranked_scores)
         profile.total_pp = self.calculate_scores_pp(scores)
-        profile.rank = self.get_rank(profile.ranked_pp)
+        profile.rank = self.get_rank(profile.total_pp)
 
         Logic.database.update_profile(profile)
 
@@ -319,16 +319,17 @@ class Logic:
         f.close()
         os.remove(Logic.temp_beatmap_name)
 
-        stars = osu.diff_calc().calc(clean_beatmap, osu.mods_from_str(score.get_mods_string()))
+        stars = osu.diff_calc().calc(clean_beatmap, osu.mods_from_str(score.get_mods_string() + "DT"))
 
         pp, _, _, _, acc = osu.ppv2(aim_stars=stars.aim, speed_stars=stars.speed, bmap=clean_beatmap,
-                                    mods=osu.mods_from_str(score.get_mods_string()), combo=score.max_combo,
+                                    mods=osu.mods_from_str(score.get_mods_string() + "DT"), combo=score.max_combo,
                                     n300=score.number_300s, n100=score.number_100s, n50=score.number_50s,
                                     nmiss=score.misses)
         return pp, acc
 
     def get_rank(self, pp):
-        rank = int(requests.get(f"https://osudaily.net/data/getPPRank.php?t=pp&v={pp}&m=0").text)
+        rank = 0
+        #rank = int(requests.get(f"https://osudaily.net/data/getPPRank.php?t=pp&v={pp}&m=0").text)
         return rank
 
     def get_scores_by_profile_id(self, profile_id):
